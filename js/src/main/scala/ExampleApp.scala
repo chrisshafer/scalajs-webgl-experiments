@@ -68,21 +68,37 @@ object ExampleApp extends JSApp {
     document.body.appendChild(canvas)
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
-
     val gl: raw.WebGLRenderingContext = canvas.getContext("webgl").asInstanceOf[raw.WebGLRenderingContext]
     gl.clearColor(0.0, 0.0, 0.0, 1.0)
+    gl.clearDepth(1.0)
+    gl.enable(DEPTH_TEST)
+    gl.depthFunc(LEQUAL)
+
+
+    var rotation = 0
+    js.timers.setInterval(15){
+      rotation = if(rotation == Int.MaxValue) 0 else rotation + 1
+      renderScene(gl)(rotation)
+    }
+  }
+
+  def rotMod(initial: Float, rotation: Int): Float = {
+
+    initial * Math.sin(Math.toRadians(rotation)).toFloat
+  }
+  def renderScene(gl: WebGLRenderingContext)(rotation: Int) = {
     gl.clear(COLOR_BUFFER_BIT)
+    gl.clear(DEPTH_BUFFER_BIT)
 
     val colorBuffer = initColorBuffer(gl)
 
     val squareVerticesBuffer = gl.createBuffer()
     gl.bindBuffer(ARRAY_BUFFER, squareVerticesBuffer)
-    val vertices: Float32Array = new Float32Array(js.Array(-0.3f, -0.3f, 0.0f,
-                                                            0.3f, -0.3f, 0.0f,
-                                                           -0.3f,  0.3f, 0.0f,
-                                                            0.3f,  0.3f, 0.0f))
+    val vertices: Float32Array = new Float32Array(js.Array(rotMod(-0.3f,rotation), -0.3f, 0.0f,
+                                                           rotMod(0.3f,rotation), -0.3f, 0.0f,
+                                                           rotMod(-0.3f,rotation),  0.3f, 0.0f,
+                                                           rotMod(0.3f,rotation),  0.3f, 0.0f))
     gl.bufferData(ARRAY_BUFFER, vertices, STATIC_DRAW)
-
 
     val program = initShaders(gl)
     gl.useProgram(program)
