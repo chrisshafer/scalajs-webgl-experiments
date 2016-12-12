@@ -45,8 +45,10 @@ object ExampleApp extends JSApp {
     val vertexShader = gl.createShader(VERTEX_SHADER)
     val vertexText = "attribute vec3 aVertexPosition;" +
       "attribute vec4 aVertexColor;" +
+      "uniform mat4 uMVMatrix;" +
+      "uniform mat4 uPMatrix;" +
       "varying lowp vec4 vColor;" +
-      vmain("gl_Position = vec4(aVertexPosition, 1);" +
+      vmain("gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1);" +
         "vColor = aVertexColor;")
 
     gl.shaderSource(vertexShader, vertexText)
@@ -74,7 +76,6 @@ object ExampleApp extends JSApp {
     gl.enable(DEPTH_TEST)
     gl.depthFunc(LEQUAL)
 
-
     var rotation = 0
     js.timers.setInterval(15){
       rotation = if(rotation == Int.MaxValue) 0 else rotation + 1
@@ -86,23 +87,42 @@ object ExampleApp extends JSApp {
 
     initial * Math.sin(Math.toRadians(rotation)).toFloat
   }
+
+  var mvMatrix: Matrix = Matrix.empty
+  var perspectiveMatrix: Matrix = Matrix.empty
+
+  def setMatrixUniforms(gl: WebGLRenderingContext, shaderProgram: WebGLProgram) {
+    val pUniform = gl.getUniformLocation(shaderProgram, "uPMatrix")
+    gl.uniformMatrix4fv(pUniform, false, new Float32Array(perspectiveMatrix.toJs.flatten.map(_.toFloat)))
+
+
+    println(mvMatrix.toString)
+    println(mvMatrix.toJs.flatten.map(_.toFloat).mkString(","))
+
+    val mvUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix")
+    gl.uniformMatrix4fv(mvUniform, false, new Float32Array(mvMatrix.toJs.flatten.map(_.toFloat)))
+  }
+
   def renderScene(gl: WebGLRenderingContext)(rotation: Int) = {
     gl.clear(COLOR_BUFFER_BIT)
     gl.clear(DEPTH_BUFFER_BIT)
+
+    perspectiveMatrix = Matrix.makePerspective(45, 640.0f/480.0f, 0.1f, 100.0f)
+    mvMatrix = Matrix.identity(4)
+    mvMatrix = mvMatrix.*(Matrix.translation(Vector(0,0,-6)))
 
     val colorBuffer = initColorBuffer(gl)
 
     val squareVerticesBuffer = gl.createBuffer()
     gl.bindBuffer(ARRAY_BUFFER, squareVerticesBuffer)
-    val vertices: Float32Array = new Float32Array(js.Array(rotMod(-0.3f,rotation), -0.3f, 0.0f,
-                                                           rotMod(0.3f,rotation), -0.3f, 0.0f,
-                                                           rotMod(-0.3f,rotation),  0.3f, 0.0f,
-                                                           rotMod(0.3f,rotation),  0.3f, 0.0f))
+    val vertices: Float32Array = new Float32Array(js.Array( 1.0,  1.0, 0.0,
+                                                           -1.0,  1.0, 0.0,
+                                                            1.0, -1.0, 0.0,
+                                                           -1.0, -1.0, 0.0))
     gl.bufferData(ARRAY_BUFFER, vertices, STATIC_DRAW)
 
     val program = initShaders(gl)
     gl.useProgram(program)
-
     val positionIndex = gl.getAttribLocation(program, "aVertexPosition")
     gl.enableVertexAttribArray(positionIndex)
     gl.vertexAttribPointer(positionIndex, 3, FLOAT, false, 0, 0)
@@ -113,6 +133,8 @@ object ExampleApp extends JSApp {
     gl.enableVertexAttribArray(colorIndex)
     gl.vertexAttribPointer(colorIndex, 4, FLOAT, false, 0, 0)
 
+
+    setMatrixUniforms(gl, program)
     gl.drawArrays(TRIANGLE_STRIP, 0, vertices.length / 3)
   }
 
