@@ -80,7 +80,7 @@ class Matrix(private val columnVectors: Array[Array[Double]]) {
 
   val toJs: js.Array[js.Array[Double]] = {
     import scalajs.js.JSConverters._
-    columnVectors.transpose.map(_.toJSArray).toJSArray 
+    columnVectors.transpose.map(_.toJSArray).toJSArray
   }
 
 

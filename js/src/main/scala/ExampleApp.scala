@@ -66,10 +66,12 @@ object ExampleApp extends JSApp {
   }
 
   def main(): Unit = {
+    val width = window.innerWidth
+    val height = window.innerHeight
     val canvas: html.Canvas = document.createElement("canvas").asInstanceOf[html.Canvas]
     document.body.appendChild(canvas)
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
+    canvas.width = width
+    canvas.height = height
     val gl: raw.WebGLRenderingContext = canvas.getContext("webgl").asInstanceOf[raw.WebGLRenderingContext]
     gl.clearColor(0.0, 0.0, 0.0, 1.0)
     gl.clearDepth(1.0)
@@ -79,13 +81,13 @@ object ExampleApp extends JSApp {
     var rotation = 0
     js.timers.setInterval(15){
       rotation = if(rotation == Int.MaxValue) 0 else rotation + 1
-      renderScene(gl)(rotation)
+      renderScene(gl)(rotation)(width,height)
     }
   }
 
-  def rotMod(initial: Float, rotation: Int): Float = {
+  def rotMod(initial: Double, rotation: Int): Double = {
 
-    initial * Math.sin(Math.toRadians(rotation)).toFloat
+    initial * Math.sin(Math.toRadians(rotation))
   }
 
   var mvMatrix: Matrix = Matrix.empty
@@ -95,19 +97,15 @@ object ExampleApp extends JSApp {
     val pUniform = gl.getUniformLocation(shaderProgram, "uPMatrix")
     gl.uniformMatrix4fv(pUniform, false, new Float32Array(perspectiveMatrix.toJs.flatten.map(_.toFloat)))
 
-
-    println(mvMatrix.toString)
-    println(mvMatrix.toJs.flatten.map(_.toFloat).mkString(","))
-
     val mvUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix")
     gl.uniformMatrix4fv(mvUniform, false, new Float32Array(mvMatrix.toJs.flatten.map(_.toFloat)))
   }
 
-  def renderScene(gl: WebGLRenderingContext)(rotation: Int) = {
+  def renderScene(gl: WebGLRenderingContext)(rotation: Int)(width: Int, height: Int) = {
     gl.clear(COLOR_BUFFER_BIT)
     gl.clear(DEPTH_BUFFER_BIT)
 
-    perspectiveMatrix = Matrix.makePerspective(45, 640.0f/480.0f, 0.1f, 100.0f)
+    perspectiveMatrix = Matrix.makePerspective(45, width.toFloat/height.toFloat, 0.1f, 100.0f)
     mvMatrix = Matrix.identity(4)
     mvMatrix = mvMatrix.*(Matrix.translation(Vector(0,0,-6)))
 
@@ -115,10 +113,10 @@ object ExampleApp extends JSApp {
 
     val squareVerticesBuffer = gl.createBuffer()
     gl.bindBuffer(ARRAY_BUFFER, squareVerticesBuffer)
-    val vertices: Float32Array = new Float32Array(js.Array( 1.0,  1.0, 0.0,
-                                                           -1.0,  1.0, 0.0,
-                                                            1.0, -1.0, 0.0,
-                                                           -1.0, -1.0, 0.0))
+    val vertices: Float32Array = new Float32Array(js.Array( rotMod(1.0,rotation),   1.0, rotMod(-1.0,rotation),
+                                                            rotMod(-1.0,rotation),  1.0, 0.0,
+                                                            rotMod(1.0,rotation),  -1.0, rotMod(-1.0,rotation),
+                                                            rotMod(-1.0,rotation), -1.0, 0.0))
     gl.bufferData(ARRAY_BUFFER, vertices, STATIC_DRAW)
 
     val program = initShaders(gl)
