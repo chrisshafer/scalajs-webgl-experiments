@@ -10,6 +10,7 @@ import org.scalajs._
 import dom._
 
 object ExampleApp extends JSApp {
+
   import raw.WebGLRenderingContext._
 
   def vmain(glCode: String) = {
@@ -24,7 +25,7 @@ object ExampleApp extends JSApp {
     fragmentShader
   }
 
-  def varyingFragmentShader(gl: WebGLRenderingContext) ={
+  def varyingFragmentShader(gl: WebGLRenderingContext) = {
     val fragmentShader = gl.createShader(FRAGMENT_SHADER)
     val fragText = "varying lowp vec4 vColor;" + vmain(s"gl_FragColor = vColor;")
     gl.shaderSource(fragmentShader, fragText)
@@ -34,7 +35,7 @@ object ExampleApp extends JSApp {
 
   def uniformVertexShader(gl: WebGLRenderingContext) = {
     val vertexShader = gl.createShader(VERTEX_SHADER)
-    val vertexText = "attribute vec2 position;" + vmain("gl_Position = vec4(aVertexPosition, 0, 1);")
+    val vertexText = "attribute vec3 position;" + vmain("gl_Position = vec4(aVertexPosition, 1);")
     gl.shaderSource(vertexShader, vertexText)
     gl.compileShader(vertexShader)
     vertexShader
@@ -42,11 +43,11 @@ object ExampleApp extends JSApp {
 
   def varyingVertexShader(gl: WebGLRenderingContext) = {
     val vertexShader = gl.createShader(VERTEX_SHADER)
-    val vertexText = "attribute vec2 aVertexPosition;" +
-                     "attribute vec4 aVertexColor;" +
-                     "varying lowp vec4 vColor;" +
-                      vmain("gl_Position = vec4(aVertexPosition, 0, 1);" +
-                            "vColor = aVertexColor;")
+    val vertexText = "attribute vec3 aVertexPosition;" +
+      "attribute vec4 aVertexColor;" +
+      "varying lowp vec4 vColor;" +
+      vmain("gl_Position = vec4(aVertexPosition, 1);" +
+        "vColor = aVertexColor;")
 
     gl.shaderSource(vertexShader, vertexText)
     gl.compileShader(vertexShader)
@@ -63,7 +64,7 @@ object ExampleApp extends JSApp {
   }
 
   def main(): Unit = {
-    val canvas: html.Canvas =    document.createElement("canvas").asInstanceOf[html.Canvas]
+    val canvas: html.Canvas = document.createElement("canvas").asInstanceOf[html.Canvas]
     document.body.appendChild(canvas)
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
@@ -76,7 +77,10 @@ object ExampleApp extends JSApp {
 
     val squareVerticesBuffer = gl.createBuffer()
     gl.bindBuffer(ARRAY_BUFFER, squareVerticesBuffer)
-    val vertices: Float32Array = new Float32Array(js.Array(-0.3f,-0.3f,   0.3f,-0.3f,  -0.3f,0.3f,  0.3f,0.3f))
+    val vertices: Float32Array = new Float32Array(js.Array(-0.3f, -0.3f, 0.0f,
+                                                            0.3f, -0.3f, 0.0f,
+                                                           -0.3f,  0.3f, 0.0f,
+                                                            0.3f,  0.3f, 0.0f))
     gl.bufferData(ARRAY_BUFFER, vertices, STATIC_DRAW)
 
 
@@ -85,7 +89,7 @@ object ExampleApp extends JSApp {
 
     val positionIndex = gl.getAttribLocation(program, "aVertexPosition")
     gl.enableVertexAttribArray(positionIndex)
-    gl.vertexAttribPointer(positionIndex, 2, FLOAT, false, 0, 0)
+    gl.vertexAttribPointer(positionIndex, 3, FLOAT, false, 0, 0)
 
     gl.bindBuffer(ARRAY_BUFFER, colorBuffer)
 
@@ -93,19 +97,19 @@ object ExampleApp extends JSApp {
     gl.enableVertexAttribArray(colorIndex)
     gl.vertexAttribPointer(colorIndex, 4, FLOAT, false, 0, 0)
 
-    gl.drawArrays(TRIANGLE_STRIP, 0, vertices.length / 2)
+    gl.drawArrays(TRIANGLE_STRIP, 0, vertices.length / 3)
   }
 
   def initColorBuffer(gl: WebGLRenderingContext): WebGLBuffer = {
     val verticesColorBuffer = gl.createBuffer()
-    gl.bindBuffer(ARRAY_BUFFER,verticesColorBuffer)
+    gl.bindBuffer(ARRAY_BUFFER, verticesColorBuffer)
     val verticeColors = new Float32Array(js.Array(
-      1.0f,  1.0f,  1.0f,  1.0f,    // white
-      1.0f,  0.0f,  0.0f,  1.0f,    // red
-      0.0f,  1.0f,  0.0f,  1.0f,    // green
-      0.0f,  0.0f,  1.0f,  1.0f     // blue
+      1.0f, 1.0f, 1.0f, 1.0f, // white
+      1.0f, 0.0f, 0.0f, 1.0f, // red
+      0.0f, 1.0f, 0.0f, 1.0f, // green
+      0.0f, 0.0f, 1.0f, 1.0f // blue
     ))
-    gl.bufferData(ARRAY_BUFFER,verticeColors,STATIC_DRAW)
+    gl.bufferData(ARRAY_BUFFER, verticeColors, STATIC_DRAW)
     verticesColorBuffer
   }
 
