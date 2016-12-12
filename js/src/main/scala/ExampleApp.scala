@@ -101,22 +101,63 @@ object ExampleApp extends JSApp {
     gl.uniformMatrix4fv(mvUniform, false, new Float32Array(mvMatrix.toJs.flatten.map(_.toFloat)))
   }
 
+  def rotate(degrees: Double, scales: Vector[Double]) = {
+    val radians = degrees * Math.PI / 180.0
+    mvMatrix = mvMatrix.*(Matrix.rotate(radians,scales))
+
+  }
   def renderScene(gl: WebGLRenderingContext)(rotation: Int)(width: Int, height: Int) = {
     gl.clear(COLOR_BUFFER_BIT)
     gl.clear(DEPTH_BUFFER_BIT)
 
     perspectiveMatrix = Matrix.makePerspective(45, width.toFloat/height.toFloat, 0.1f, 100.0f)
     mvMatrix = Matrix.identity(4)
+    rotate(rotation,Vector(0, 1, 1))
     mvMatrix = mvMatrix.*(Matrix.translation(Vector(0,0,-6)))
 
+    
     val colorBuffer = initColorBuffer(gl)
 
     val squareVerticesBuffer = gl.createBuffer()
     gl.bindBuffer(ARRAY_BUFFER, squareVerticesBuffer)
-    val vertices: Float32Array = new Float32Array(js.Array( rotMod(1.0,rotation),   1.0, rotMod(-1.0,rotation),
-                                                            rotMod(-1.0,rotation),  1.0, 0.0,
-                                                            rotMod(1.0,rotation),  -1.0, rotMod(-1.0,rotation),
-                                                            rotMod(-1.0,rotation), -1.0, 0.0))
+    val vertices: Float32Array = new Float32Array(js.Array(
+      // Front face
+      -1.0, -1.0,  1.0,
+      1.0, -1.0,  1.0,
+      1.0,  1.0,  1.0,
+      -1.0,  1.0,  1.0,
+
+      // Back face
+      -1.0, -1.0, -1.0,
+      -1.0,  1.0, -1.0,
+      1.0,  1.0, -1.0,
+      1.0, -1.0, -1.0,
+
+      // Top face
+      -1.0,  1.0, -1.0,
+      -1.0,  1.0,  1.0,
+      1.0,  1.0,  1.0,
+      1.0,  1.0, -1.0,
+
+      // Bottom face
+      -1.0, -1.0, -1.0,
+      1.0, -1.0, -1.0,
+      1.0, -1.0,  1.0,
+      -1.0, -1.0,  1.0,
+
+      // Right face
+      1.0, -1.0, -1.0,
+      1.0,  1.0, -1.0,
+      1.0,  1.0,  1.0,
+      1.0, -1.0,  1.0,
+
+      // Left face
+      -1.0, -1.0, -1.0,
+      -1.0, -1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      -1.0,  1.0, -1.0
+    ))
+
     gl.bufferData(ARRAY_BUFFER, vertices, STATIC_DRAW)
 
     val program = initShaders(gl)
@@ -131,9 +172,10 @@ object ExampleApp extends JSApp {
     gl.enableVertexAttribArray(colorIndex)
     gl.vertexAttribPointer(colorIndex, 4, FLOAT, false, 0, 0)
 
-
+    val cubeBuffer = initVerticesIndexBuffer(gl)
+    gl.bindBuffer(ELEMENT_ARRAY_BUFFER,cubeBuffer)
     setMatrixUniforms(gl, program)
-    gl.drawArrays(TRIANGLE_STRIP, 0, vertices.length / 3)
+    gl.drawElements(TRIANGLES, 36, UNSIGNED_SHORT, 0)
   }
 
   def initColorBuffer(gl: WebGLRenderingContext): WebGLBuffer = {
@@ -143,10 +185,51 @@ object ExampleApp extends JSApp {
       1.0f, 1.0f, 1.0f, 1.0f, // white
       1.0f, 0.0f, 0.0f, 1.0f, // red
       0.0f, 1.0f, 0.0f, 1.0f, // green
+      0.0f, 0.0f, 1.0f, 1.0f, // blue
+
+      1.0f, 1.0f, 1.0f, 1.0f, // white
+      1.0f, 0.0f, 0.0f, 1.0f, // red
+      0.0f, 1.0f, 0.0f, 1.0f, // green
+      0.0f, 0.0f, 1.0f, 1.0f, // blue
+
+      1.0f, 1.0f, 1.0f, 1.0f, // white
+      1.0f, 0.0f, 0.0f, 1.0f, // red
+      0.0f, 1.0f, 0.0f, 1.0f, // green
+      0.0f, 0.0f, 1.0f, 1.0f, // blue
+
+      1.0f, 1.0f, 1.0f, 1.0f, // white
+      1.0f, 0.0f, 0.0f, 1.0f, // red
+      0.0f, 1.0f, 0.0f, 1.0f, // green
+      0.0f, 0.0f, 1.0f, 1.0f, // blue
+
+      1.0f, 1.0f, 1.0f, 1.0f, // white
+      1.0f, 0.0f, 0.0f, 1.0f, // red
+      0.0f, 1.0f, 0.0f, 1.0f, // green
+      0.0f, 0.0f, 1.0f, 1.0f, // blue
+
+      1.0f, 1.0f, 1.0f, 1.0f, // white
+      1.0f, 0.0f, 0.0f, 1.0f, // red
+      0.0f, 1.0f, 0.0f, 1.0f, // green
       0.0f, 0.0f, 1.0f, 1.0f // blue
     ))
     gl.bufferData(ARRAY_BUFFER, verticeColors, STATIC_DRAW)
     verticesColorBuffer
+  }
+
+  def initVerticesIndexBuffer(gl: WebGLRenderingContext): WebGLBuffer = {
+    val cubeVerticesIndexBuffer = gl.createBuffer()
+    gl.bindBuffer(ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer)
+    val verticeIndices = new Uint16Array(js.Array(
+    0,  1,  2,      0,  2,  3,    // front
+    4,  5,  6,      4,  6,  7,    // back
+    8,  9,  10,     8,  10, 11,   // top
+    12, 13, 14,     12, 14, 15,   // bottom
+    16, 17, 18,     16, 18, 19,   // right
+    20, 21, 22,     20, 22, 23    // left
+    ))
+
+    gl.bufferData(ELEMENT_ARRAY_BUFFER, verticeIndices, STATIC_DRAW)
+    cubeVerticesIndexBuffer
   }
 
 }

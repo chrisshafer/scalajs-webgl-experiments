@@ -54,6 +54,30 @@ object Matrix{
     } else throw new Exception("Invalid vector length for translation")
   }
 
+  def modulus(vec: Vector[Double]) = {
+    Math.sqrt(vec.map(x => x*x).sum)
+  }
+
+  def rotate(theta: Double, a: Vector[Double]) = {
+    val axis = a
+    if (axis.length != 3) throw new Exception("Rotate only takes a vector of 3")
+    val mod = modulus(axis)
+    val x = axis(0)/mod
+    val y = axis(1)/mod
+    val z = axis(2)/mod
+    val s = Math.sin(theta)
+    val c = Math.cos(theta)
+    val t = 1 - c
+    // Formula derived here: http://www.gamedev.net/reference/articles/article1199.asp
+    // That proof rotates the co-ordinate system so theta becomes -theta and sin
+    // becomes -sin here.
+    new Matrix(Array(
+      Array( t*x*x + c, t*x*y - s*z, t*x*z + s*y, 0),
+      Array( t*x*y + s*z, t*y*y + c, t*y*z - s*x, 0 ),
+      Array( t*x*z - s*y, t*y*z + s*x, t*z*z + c, 0 ),
+      Array( 0, 0, 0, 1.0 ))
+    )
+  }
 
 
 }
