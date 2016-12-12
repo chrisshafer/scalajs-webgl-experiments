@@ -56,8 +56,8 @@ gulp.task("scalajs", function() {
 });
 
 gulp.task("image", function() {
-    return gulp.src([workingDir + '/img/**/*.*'])
-        .pipe(gulp.dest(developmentDir + "/resources/img"));
+    return gulp.src([workingDir + '/image/**/*.*'])
+        .pipe(gulp.dest(developmentDir + "/resources/image"));
 });
 
 gulp.task("font", function() {

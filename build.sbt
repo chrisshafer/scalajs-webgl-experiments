@@ -19,6 +19,7 @@ lazy val sharedLibs = Seq()
 
 lazy val webglExperiments = crossProject.in(file("."))
   .settings(
+    mainClass in Compile := Some("ExampleAppTextures"),
     name := projectName,
     organization := org,
     scalaVersion := scalaV,

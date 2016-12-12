@@ -1,5 +1,8 @@
+import org.scalajs.dom.ext.Image
 import org.scalajs.dom.html
-import org.scalajs.dom.raw.{WebGLBuffer, WebGLProgram, WebGLRenderingContext}
+import org.scalajs.dom.html.Image
+import org.scalajs.dom.raw.{WebGLTexture, WebGLBuffer, WebGLProgram, WebGLRenderingContext}
+import org.w3c.dom.html.HTMLImageElement
 
 import scala.scalajs.js
 import scala.scalajs.js.JSApp
@@ -9,7 +12,7 @@ import scala.scalajs.js.typedarray._
 import org.scalajs._
 import dom._
 
-object ExampleApp extends JSApp {
+object ExampleAppTextures extends JSApp {
 
   import raw.WebGLRenderingContext._
 
@@ -17,39 +20,25 @@ object ExampleApp extends JSApp {
     s"void main(void) { ${glCode} }"
   }
 
-  def uniformFragmentShader(gl: WebGLRenderingContext)(r: Float, g: Float, b: Float, a: Float) = {
-    val fragmentShader = gl.createShader(FRAGMENT_SHADER)
-    val fragText = "precision highp float;" + "uniform vec4 color;" + vmain(s"gl_FragColor = vec4($r, $g, $b, $a);")
-    gl.shaderSource(fragmentShader, fragText)
-    gl.compileShader(fragmentShader)
-    fragmentShader
-  }
-
   def varyingFragmentShader(gl: WebGLRenderingContext) = {
     val fragmentShader = gl.createShader(FRAGMENT_SHADER)
-    val fragText = "varying lowp vec4 vColor;" + vmain(s"gl_FragColor = vColor;")
+    val fragText = "varying highp vec2 vTextureCoord;" +
+                   "uniform sampler2D uSampler;" +
+                    vmain(s"gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));")
     gl.shaderSource(fragmentShader, fragText)
     gl.compileShader(fragmentShader)
     fragmentShader
-  }
-
-  def uniformVertexShader(gl: WebGLRenderingContext) = {
-    val vertexShader = gl.createShader(VERTEX_SHADER)
-    val vertexText = "attribute vec3 position;" + vmain("gl_Position = vec4(aVertexPosition, 1);")
-    gl.shaderSource(vertexShader, vertexText)
-    gl.compileShader(vertexShader)
-    vertexShader
   }
 
   def varyingVertexShader(gl: WebGLRenderingContext) = {
     val vertexShader = gl.createShader(VERTEX_SHADER)
     val vertexText = "attribute vec3 aVertexPosition;" +
-      "attribute vec4 aVertexColor;" +
+      "attribute vec2 aTextureCoord;" +
       "uniform mat4 uMVMatrix;" +
       "uniform mat4 uPMatrix;" +
-      "varying lowp vec4 vColor;" +
+      "varying highp vec2 vTextureCoord;" +
       vmain("gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1);" +
-        "vColor = aVertexColor;")
+        "vTextureCoord = aTextureCoord;")
 
     gl.shaderSource(vertexShader, vertexText)
     gl.compileShader(vertexShader)
@@ -79,9 +68,11 @@ object ExampleApp extends JSApp {
     gl.depthFunc(LEQUAL)
 
     var rotation = 0
+    val texturePointer = initTextures(gl)
+
     js.timers.setInterval(15){
       rotation = if(rotation == Int.MaxValue) 0 else rotation + 1
-      renderScene(gl)(rotation)(width,height)
+      renderScene(gl)(rotation)(width,height,texturePointer)
     }
   }
 
@@ -90,8 +81,7 @@ object ExampleApp extends JSApp {
     initial * Math.sin(Math.toRadians(rotation))
   }
 
-  var mvMatrix: Matrix = Matrix.empty
-  var perspectiveMatrix: Matrix = Matrix.empty
+
 
   def setMatrixUniforms(gl: WebGLRenderingContext, shaderProgram: WebGLProgram) {
     val pUniform = gl.getUniformLocation(shaderProgram, "uPMatrix")
@@ -106,7 +96,49 @@ object ExampleApp extends JSApp {
     mvMatrix = mvMatrix.*(Matrix.rotate(radians,scales))
 
   }
-  def renderScene(gl: WebGLRenderingContext)(rotation: Int)(width: Int, height: Int) = {
+
+  val vertices: Float32Array = new Float32Array(js.Array(
+    // Front face
+    -1.0, -1.0,  1.0,
+    1.0, -1.0,  1.0,
+    1.0,  1.0,  1.0,
+    -1.0,  1.0,  1.0,
+
+    // Back face
+    -1.0, -1.0, -1.0,
+    -1.0,  1.0, -1.0,
+    1.0,  1.0, -1.0,
+    1.0, -1.0, -1.0,
+
+    // Top face
+    -1.0,  1.0, -1.0,
+    -1.0,  1.0,  1.0,
+    1.0,  1.0,  1.0,
+    1.0,  1.0, -1.0,
+
+    // Bottom face
+    -1.0, -1.0, -1.0,
+    1.0, -1.0, -1.0,
+    1.0, -1.0,  1.0,
+    -1.0, -1.0,  1.0,
+
+    // Right face
+    1.0, -1.0, -1.0,
+    1.0,  1.0, -1.0,
+    1.0,  1.0,  1.0,
+    1.0, -1.0,  1.0,
+
+    // Left face
+    -1.0, -1.0, -1.0,
+    -1.0, -1.0,  1.0,
+    -1.0,  1.0,  1.0,
+    -1.0,  1.0, -1.0
+  ))
+
+  var mvMatrix: Matrix = Matrix.empty
+  var perspectiveMatrix: Matrix = Matrix.empty
+
+  def renderScene(gl: WebGLRenderingContext)(rotation: Int)(width: Int, height: Int, texture: WebGLTexture) = {
     gl.clear(COLOR_BUFFER_BIT)
     gl.clear(DEPTH_BUFFER_BIT)
 
@@ -116,47 +148,11 @@ object ExampleApp extends JSApp {
     mvMatrix = mvMatrix.*(Matrix.translation(Vector(0,0,-6)))
 
 
-    val colorBuffer = initColorBuffer(gl)
+    val textureBuffer = initTextureBuffer(gl)
 
     val squareVerticesBuffer = gl.createBuffer()
     gl.bindBuffer(ARRAY_BUFFER, squareVerticesBuffer)
-    val vertices: Float32Array = new Float32Array(js.Array(
-      // Front face
-      -1.0, -1.0,  1.0,
-      1.0, -1.0,  1.0,
-      1.0,  1.0,  1.0,
-      -1.0,  1.0,  1.0,
 
-      // Back face
-      -1.0, -1.0, -1.0,
-      -1.0,  1.0, -1.0,
-      1.0,  1.0, -1.0,
-      1.0, -1.0, -1.0,
-
-      // Top face
-      -1.0,  1.0, -1.0,
-      -1.0,  1.0,  1.0,
-      1.0,  1.0,  1.0,
-      1.0,  1.0, -1.0,
-
-      // Bottom face
-      -1.0, -1.0, -1.0,
-      1.0, -1.0, -1.0,
-      1.0, -1.0,  1.0,
-      -1.0, -1.0,  1.0,
-
-      // Right face
-      1.0, -1.0, -1.0,
-      1.0,  1.0, -1.0,
-      1.0,  1.0,  1.0,
-      1.0, -1.0,  1.0,
-
-      // Left face
-      -1.0, -1.0, -1.0,
-      -1.0, -1.0,  1.0,
-      -1.0,  1.0,  1.0,
-      -1.0,  1.0, -1.0
-    ))
 
     gl.bufferData(ARRAY_BUFFER, vertices, STATIC_DRAW)
 
@@ -166,11 +162,14 @@ object ExampleApp extends JSApp {
     gl.enableVertexAttribArray(positionIndex)
     gl.vertexAttribPointer(positionIndex, 3, FLOAT, false, 0, 0)
 
-    gl.bindBuffer(ARRAY_BUFFER, colorBuffer)
+    gl.bindBuffer(ARRAY_BUFFER, textureBuffer)
+    val textureCoordAttribute = gl.getAttribLocation(program, "aTextureCoord")
+    gl.enableVertexAttribArray(textureCoordAttribute)
+    gl.vertexAttribPointer(textureCoordAttribute, 2, FLOAT, false, 0, 0)
 
-    val colorIndex = gl.getAttribLocation(program, "aVertexColor")
-    gl.enableVertexAttribArray(colorIndex)
-    gl.vertexAttribPointer(colorIndex, 4, FLOAT, false, 0, 0)
+    gl.activeTexture(TEXTURE0)
+    gl.bindTexture(TEXTURE_2D, texture)
+    gl.uniform1i(gl.getUniformLocation(program, "uSampler"), 0)
 
     val cubeBuffer = initVerticesIndexBuffer(gl)
     gl.bindBuffer(ELEMENT_ARRAY_BUFFER,cubeBuffer)
@@ -178,42 +177,63 @@ object ExampleApp extends JSApp {
     gl.drawElements(TRIANGLES, 36, UNSIGNED_SHORT, 0)
   }
 
-  def initColorBuffer(gl: WebGLRenderingContext): WebGLBuffer = {
-    val verticesColorBuffer = gl.createBuffer()
-    gl.bindBuffer(ARRAY_BUFFER, verticesColorBuffer)
-    val verticeColors = new Float32Array(js.Array(
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-
-      0.0f, 0.0f, 1.0f, 1.0f, // blue
-      0.0f, 0.0f, 1.0f, 1.0f, // blue
-      0.0f, 0.0f, 1.0f, 1.0f, // blue
-      0.0f, 0.0f, 1.0f, 1.0f, // blue
-
-      1.0f, 1.0f, 1.0f, 1.0f, // white
-      1.0f, 1.0f, 1.0f, 1.0f, // white
-      1.0f, 1.0f, 1.0f, 1.0f, // white
-      1.0f, 1.0f, 1.0f, 1.0f, // white
-
-      1.0f, 0.0f, 0.0f, 1.0f, // red
-      1.0f, 0.0f, 0.0f, 1.0f, // red
-      1.0f, 0.0f, 0.0f, 1.0f, // red
-      1.0f, 0.0f, 0.0f, 1.0f, // red
-
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-      0.0f, 1.0f, 0.0f, 1.0f, // green
-
-      1.0f, 0.0f, 0.0f, 1.0f, // red
-      1.0f, 0.0f, 0.0f, 1.0f, // red
-      1.0f, 0.0f, 0.0f, 1.0f, // red
-      1.0f, 0.0f, 0.0f, 1.0f // red
+  def initTextureBuffer(gl: WebGLRenderingContext): WebGLBuffer = {
+    val verticesTextureBuffer = gl.createBuffer()
+    gl.bindBuffer(ARRAY_BUFFER, verticesTextureBuffer)
+    val textures = new Float32Array(js.Array(
+      // Front
+      0.0,  0.0,
+      1.0,  0.0,
+      1.0,  1.0,
+      0.0,  1.0,
+      // Back
+      0.0,  0.0,
+      1.0,  0.0,
+      1.0,  1.0,
+      0.0,  1.0,
+      // Top
+      0.0,  0.0,
+      1.0,  0.0,
+      1.0,  1.0,
+      0.0,  1.0,
+      // Bottom
+      0.0,  0.0,
+      1.0,  0.0,
+      1.0,  1.0,
+      0.0,  1.0,
+      // Right
+      0.0,  0.0,
+      1.0,  0.0,
+      1.0,  1.0,
+      0.0,  1.0,
+      // Left
+      0.0,  0.0,
+      1.0,  0.0,
+      1.0,  1.0,
+      0.0,  1.0
     ))
-    gl.bufferData(ARRAY_BUFFER, verticeColors, STATIC_DRAW)
-    verticesColorBuffer
+    gl.bufferData(ARRAY_BUFFER, textures, STATIC_DRAW)
+    verticesTextureBuffer
+  }
+
+  def initTextures(gl: WebGLRenderingContext): WebGLTexture = {
+    val texture = gl.createTexture()
+    val cubeImage = dom.document.createElement("img").asInstanceOf[Image]
+    cubeImage.onload = { x: Event =>
+      handleTexture(gl)(cubeImage, texture)
+    }
+    cubeImage.src = "resources/image/cubetexture.png"
+    texture
+  }
+
+  def handleTexture(gl: WebGLRenderingContext)(image: Image, texture: WebGLTexture) = {
+      console.log("handleTextureLoaded, image = " + image)
+      gl.bindTexture(TEXTURE_2D, texture)
+      gl.texImage2D(TEXTURE_2D, 0, RGBA, RGBA, UNSIGNED_BYTE, image)
+      gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, LINEAR)
+      gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, LINEAR_MIPMAP_NEAREST)
+      gl.generateMipmap(TEXTURE_2D)
+      gl.bindTexture(TEXTURE_2D, null)
   }
 
   def initVerticesIndexBuffer(gl: WebGLRenderingContext): WebGLBuffer = {
