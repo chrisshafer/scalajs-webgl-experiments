@@ -115,4 +115,6 @@ class Matrix(private val columnVectors: Array[Array[Double]]) {
   override def toString = {
     columnVectors.transpose.map(_.mkString(", ")).mkString("\n")
   }
+
+  def transpose = new Matrix(columnVectors.transpose)
 }
